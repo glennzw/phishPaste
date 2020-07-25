@@ -58,9 +58,21 @@ func main() {
 		}
 
 	} else {
+		if *dryRun {
+			fmt.Println("[-] Dry run mode enabled, no data will actually be copied")
+		}
+
+		// Check users exist
+		if _, ok := users[*sourceUser]; !ok {
+			fmt.Println("[!] No such source user: ", *sourceUser)
+			os.Exit(-1)
+		}
+		if _, ok := users[*desintationUser]; !ok {
+			fmt.Println("[!] No such source user: ", *desintationUser)
+			os.Exit(-1)
+		}
 
 		// Copy each of the requried tables
-		fmt.Println("[-] Dry run mode enabled, no data will actually be copied")
 		if *copyLandingPages {
 			var pagesSource []models.Page
 			var pagesDestination []models.Page
@@ -91,8 +103,10 @@ func main() {
 		if *copyEmailTemplates {
 			var templatesSource []models.Template
 			var templatesDestination []models.Template
+
 			pdMap := make(map[string]bool) // Used to check we don't have duplicate template pages
 			var count int
+			var attachmentCount int
 			DB.Where("user_id = ?", users[*sourceUser]).Find(&templatesSource).Count(&count) // Source
 			DB.Where("user_id = ?", users[*desintationUser]).Find(&templatesDestination)     // Destination
 			for _, pd := range templatesDestination {
@@ -104,13 +118,33 @@ func main() {
 				if _, ok := pdMap[p.Name]; ok {
 					fmt.Printf("\t❌ %s (destination user already has template of the same name)\n", p.Name)
 				} else {
+
+					// Grab attachments
+					var attachments []models.Attachment
+					DB.Where("template_id = ?", p.Id).Find(&attachments).Count(&attachmentCount)
+
 					newTemplate := p
 					newTemplate.Id = 0
 					newTemplate.UserId = users[*desintationUser]
+					//newTemplate.Attachments = newAttachments		// This does an update on the old attachment, can't figure out why. Solution is to do manual inserts below.
+
 					if !*dryRun {
 						DB.Create(&newTemplate)
+
+						//Insert attachments
+						newAttachments := attachments
+						for _, a := range newAttachments {
+							a.Id = 0
+							a.TemplateId = newTemplate.Id // We grab the ID of the freshly inserted new template
+							DB.Create(&a)                 // And insert each attachment
+						}
+
 					}
-					fmt.Printf("\t✅ %s \n", p.Name)
+					if attachmentCount > 0 {
+						fmt.Printf("\t✅ %s (including %d attachments) \n", p.Name, attachmentCount)
+					} else {
+						fmt.Printf("\t✅ %s \n", p.Name)
+					}
 				}
 			}
 

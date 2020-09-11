@@ -165,13 +165,31 @@ func main() {
 				if _, ok := pdMap[p.Name]; ok {
 					fmt.Printf("\t❌ %s (destination user already has sending profile of the same name)\n", p.Name)
 				} else {
+
+					// Grab X-Headers
+					var headers []models.Header
+					var headerCount int
+					DB.Where("smtp_id = ?", p.Id).Find(&headers).Count(&headerCount)
+
 					newSMTP := p
 					newSMTP.Id = 0
 					newSMTP.UserId = users[*desintationUser]
 					if !*dryRun {
 						DB.Create(&newSMTP)
+
+						// Insert headers
+						newHeaders := headers
+						for _, a := range newHeaders {
+							a.Id = 0
+							a.SMTPId = newSMTP.Id // We grab the ID of the freshly inserted new sending profile
+							DB.Create(&a)         // And insert each header
+						}
 					}
-					fmt.Printf("\t✅ %s \n", p.Name)
+					if headerCount > 0 {
+						fmt.Printf("\t✅ %s (including %d headers) \n", p.Name, headerCount)
+					} else {
+						fmt.Printf("\t✅ %s \n", p.Name)
+					}
 				}
 			}
 

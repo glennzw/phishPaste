@@ -48,4 +48,4 @@ $ ./phishpaste --source admin --destination bobby --sending-profiles --email-tem
 
 ```
 
-Note: If a destination item exists with the same name it's skipped (as you can see in the above output).
+Note: If a destination item exists with the same name it's skipped (as you can see in the above output). The `--overwrite` option wil replace entrie with the same name.
